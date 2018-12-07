@@ -18,47 +18,48 @@ const jsonUtils = require('../../zlux-proxy-server/js/jsonUtils.js');
 const PRODUCT_CODE = 'ZLUX';
 
 const appConfig = {
-    productCode: PRODUCT_CODE,
-    rootRedirectURL: '/' + PRODUCT_CODE + '/plugins/org.zowe.zlux.bootstrap/web/',
-    rootServices: [
-      {
-        method: '*',
-        url: '/login',
-        requiresAuth: false
-      },
-      {
-        method: '*',
-        url: '/logout',
-      },
-      {
-        method: '*',
-        url: '/unixfile'
-      },
-      {
-        method: '*',
-        url: '/datasetContents'
-      },
-      {
-        method: '*',
-        url: '/VSAMdatasetContents'
-      },
-      {
-        method: '*',
-        url: '/datasetMetadata'
-      },
-      {
-        method: '*',
-        url: '/config'
-      },
-      {
-        method: '*',
-        url: '/ras'
-      },
-      {
-        method: '*',
-        url: '/security-mgmt'
-      }  
-   ]
+  productCode: PRODUCT_CODE,
+  rootRedirectURL: '/' + PRODUCT_CODE + '/plugins/org.zowe.zlux.bootstrap/web/',
+//removed from use, use GET /agent/services instead
+  rootServices: [
+    {
+      method: '*',
+      url: '/login',
+      requiresAuth: false
+    },
+    {
+      method: '*',
+      url: '/logout'
+    },
+    {
+      method: '*',
+      url: '/unixfile'
+    },
+    {
+      method: '*',
+      url: '/datasetContents'
+    },
+    {
+      method: '*',
+      url: '/VSAMdatasetContents'
+    },
+    {
+      method: '*',
+      url: '/datasetMetadata'
+    },
+    {
+      method: '*',
+      url: '/config'
+    },
+    {
+      method: '*',
+      url: '/ras'
+    },
+    {
+      method: '*',
+      url: '/security-mgmt'
+    }  
+  ]
 };
 
 const DEFAULT_CONFIG = {
@@ -87,7 +88,7 @@ const DEFAULT_CONFIG = {
       }
     }
   },
-  "zssPort":8542
+  "osAgentPort":8542
 };
 
 const MVD_ARGS = [
@@ -101,15 +102,16 @@ const MVD_ARGS = [
   new argParser.CLIArgument('allowInvalidTLSProxy', null, 
       argParser.constants.ARG_TYPE_VALUE),
   new argParser.CLIArgument('mlUser', 'mu', argParser.constants.ARG_TYPE_VALUE),
-  new argParser.CLIArgument('mlPass', 'mp', argParser.constants.ARG_TYPE_VALUE)
+  new argParser.CLIArgument('mlPass', 'mp', argParser.constants.ARG_TYPE_VALUE),
+  new argParser.CLIArgument('noOSAgent', null, argParser.constants.ARG_TYPE_FLAG)
 ];
 
 var config;
-var zssHost = '127.0.0.1';
 var commandArgs = process.argv.slice(2);
 var argumentParser = argParser.createParser(MVD_ARGS);
 var userInput = argumentParser.parse(commandArgs);
 var noPrompt = false;
+console.log("User input:",userInput);
 
 if (userInput.noPrompt) {
   noPrompt = true;
@@ -124,7 +126,8 @@ const userConfig = jsonUtils.parseJSONWithComments(userInput.config);
 for (const attribute in userConfig) { 
   configJSON[attribute] = userConfig[attribute]; 
 }
-let hostPort = userInput.hostPort;
+var osAgentHost = userInput.hostServer;
+let osAgentPort = userInput.hostPort;
 let eUser = userInput.mlUser;
 let ePass = userInput.mlPass;
 if(eUser && ePass){
@@ -132,24 +135,32 @@ if(eUser && ePass){
   configJSON.node.mediationLayer.instance.instanceId = `${configJSON.node.mediationLayer.instance.app}:${Math.floor(Math.random() * 9999)}`;
   configJSON.node.mediationLayer.eureka.serviceUrls.default = [`http://${eUser}:${ePass}@${configJSON.node.mediationLayer.server.hostname}:${configJSON.node.mediationLayer.server.port}/eureka/apps/`];
 }
-if (!hostPort) {
-  hostPort = configJSON.zssPort;
-}
-if (userInput.hostServer) {
-  zssHost = userInput.hostServer;
+if (userInput.noOSAgent) {
+  osAgentPort = undefined;
+  osAgentHost = undefined;
+} else {
+  if (!osAgentPort) {
+    osAgentPort = configJSON.osAgentPort !== undefined ? configJSON.osAgentPort : configJSON.zssPort;
+  }
+  if (!osAgentHost) {
+    osAgentHost = configJSON.osAgentHost !== undefined ? configJSON.osAgentHost : '127.0.0.1';
+  }  
 }
 if (userInput.port) {
   configJSON.node.http.port = userInput.port;
 }
-if (userInput.securePort && configJSON.https) {
+if (userInput.securePort && configJSON.node.https) {
   configJSON.node.https.port = userInput.securePort;
 }
 if (userInput.noChild) {
   delete configJSON.node.childProcesses;
 }
 const startUpConfig = {
-  proxiedHost: zssHost,
-  proxiedPort: hostPort,
+  //deprecated, to be removed in place of osAgentHost and osAgentPort later
+  proxiedHost: osAgentHost,
+  proxiedPort: osAgentPort,
+  osAgentHost: osAgentHost,
+  osAgentPort: osAgentPort,
   allowInvalidTLSProxy: (userInput.allowInvalidTLSProxy === 'true')
 };
 
