@@ -23,14 +23,14 @@
 
 if [ -n "$NODE_HOME" ]
 then
-  NODE_BIN=${NODE_HOME}/bin/node
+  export NODE_BIN=${NODE_HOME}/bin/node
   export PATH=${NODE_HOME}/bin:$PATH
 elif [ -n "$ZOWE_NODE_HOME" ]
 then
-  NODE_BIN=${ZOWE_NODE_HOME}/bin/node
+  export NODE_BIN=${ZOWE_NODE_HOME}/bin/node
   export PATH=${ZOWE_NODE_HOME}/bin:$PATH
 else
-  NODE_BIN=node
+  export NODE_BIN=node
 fi
 export _BPXK_AUTOCVT=ON
 
@@ -211,7 +211,7 @@ fi
 
 #Determined log file.  Run node appropriately.
 cd $dir
-export NODE_PATH=../..:../../zlux-server-framework/node_modules:$NODE_PATH
+export NODE_PATH=$dir/../..:$dir/../../zlux-server-framework/node_modules:$NODE_PATH
 cd ../lib
 
 export "_CEE_RUNOPTS=XPLINK(ON),HEAPPOOLS(ON)"
@@ -220,19 +220,6 @@ echo Show Environment
 env
 echo Show location of node
 type node
-
-
-echo Starting node
-if [ -z "$ZLUX_NO_CLUSTER" ]
-then
-  ZLUX_SERVER_FILE=zluxCluster.js
-  if [ -z "$ZLUX_MIN_WORKERS" ]
-  then
-    export ZLUX_MIN_WORKERS=2
-  fi
-else
-  ZLUX_SERVER_FILE=zluxServer.js
-fi
 
 if [ -z "$ZOWE_PREFIX" ]
 then
@@ -244,5 +231,17 @@ then
 fi
 JOBNAME=${ZOWE_PREFIX}DS${ZOWE_INSTANCE}
 
-{ __UNTAGGED_READ_MODE=V6 _BPX_JOBNAME=${JOBNAME} ${NODE_BIN} --harmony --title "${JOBNAME}" ${ZLUX_SERVER_FILE} --config="${CONFIG_FILE}" "$@" 2>&1 ; echo "Ended with rc=$?" ; } | tee $ZLUX_NODE_LOG_FILE
+echo Starting node
+if [ -z "$ZLUX_NO_CLUSTER" ]
+then
+  ZLUX_SERVER_FILE=zluxCluster.js
+  if [ -z "$ZLUX_MIN_WORKERS" ]
+  then
+    export ZLUX_MIN_WORKERS=2
+  fi
+else
+  rm $ZLUX_NODE_LOG_FILE
+  ZLUX_SERVER_FILE=zluxForever.js
+fi
 
+{ __UNTAGGED_READ_MODE=V6 _BPX_JOBNAME=${JOBNAME} ${NODE_BIN} --harmony --title "${JOBNAME}" ${ZLUX_SERVER_FILE} --config="${CONFIG_FILE}" "$@" 2>&1 ; echo "Ended with rc=$?" ; } | tee $ZLUX_NODE_LOG_FILE
